@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="KINESIS" class="com.hyp3r.services.kinesis.logback.KinesisAppender">
+        <appName>myApp</appName>
+        <environment>staging</environment>
+        <streamName>testStream</streamName>
+        <awsRegion>us-east-1</awsRegion>
+        <eventsOnly>true</eventsOnly>
+    </appender>
+    <appender name="stdout" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%5p [%t] (%F:%L) - %m%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="KinesisLogger" additivity="false" level="INFO">
+        <appender-ref ref="KINESIS"/>
+    </logger>
+    <root level="INFO">
+        <appender-ref ref="stdout"/>
+    </root>
+</configuration>

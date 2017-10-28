@@ -1,0 +1,117 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
+
+group = 'com.hyp3r'
+archivesBaseName = 'kinesis-logback-appender'
+version = '0.0.1'
+
+repositories {
+    mavenCentral()
+}
+
+def aws = [
+        'com.amazonaws:aws-java-sdk-core:1.11.221',
+        'com.amazonaws:amazon-kinesis-producer:0.12.5'
+]
+def logback = 'ch.qos.logback:logback-classic:1.2.3'
+def sl4j = [
+        'org.slf4j:slf4j-api:1.7.25',
+        'org.slf4j:slf4j-ext:1.7.25'
+]
+def misc = [
+        'org.projectlombok:lombok:1.16.18',
+        'org.apache.commons:commons-lang3:3.6',
+        'com.google.code.gson:gson:2.8.2'
+]
+
+dependencies {
+    compile aws, logback, sl4j, misc
+}
+
+jar {
+    baseName = archivesBaseName
+    version = version
+}
+
+task javadocJar(type: Jar) {
+    classifier = 'javadoc'
+    from sourceSets.main.allJava
+}
+
+task sourcesJar(type: Jar, dependsOn:classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+signing {
+    sign configurations.archives
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            pom.project {
+                name 'Kinesis Logback Appender'
+                packaging 'jar'
+                description 'This Logback Appender for Amazon Kinesis enables Java applications to send their logs in a structured format to an Amazon Kinesis stream'
+                url 'https://github.com/hyp3rventures/kinesis-logback-appender'
+
+                scm {
+                    connection 'scm:git:git://github.com/hyp3rventures/kinesis-logback-appender.git'
+                    developerConnection 'scm:git:git@github.com/hyp3rventures/kinesis-logback-appender.git'
+                    url 'https://github.com/hyp3rventures/kinesis-logback-appender'
+                }
+
+                licenses {
+                    license {
+                        name 'The Apache License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id 'senorllama'
+                        name 'Marvin Guerra'
+                        email 'oss@marvinguerra.com'
+                    }
+                }
+            }
+        }
+    }
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+compileJava.dependsOn(processResources)
+compileJava {
+    options.compilerArgs += ["-Xlint:unchecked"]
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '4.3'
+}
