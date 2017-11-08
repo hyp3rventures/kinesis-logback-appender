@@ -13,6 +13,10 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
         super(logger, LoggerWrapper.class.getName());
     }
 
+    public void kTrace(String eventType, String fmt, Object... args) {
+        kLevel(Level.TRACE, eventType, null, null, fmt, null, args);
+    }
+
     public void kDebug(String eventType, String fmt, Object... args) {
         kDebug(eventType, null, fmt, args);
     }
@@ -69,7 +73,7 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
     }
 
     public void kError(String eventType, String context, Map<String, String> mdc, String fmt, Throwable ex) {
-        kLevel(Level.ERROR, eventType, context, mdc, fmt, null, ex);
+        kLevel(Level.ERROR, eventType, context, mdc, fmt, ex);
     }
 
     private void kLevel(Level level, String eventType, String context, Map<String, String> mdc, String fmt, Throwable ex, Object... args) {
@@ -101,9 +105,13 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
                 if (ex == null) {
                     logger.error(fmt, args);
                 } else {
+                    MDC.put("exception", ex.getClass().getName());
+                    MDC.put("exceptionMessage", ex.getMessage());
                     logger.error(fmt, ex);
                 }
                 break;
+            default:
+                logger.trace(fmt, args);
         }
 
         MDC.clear();

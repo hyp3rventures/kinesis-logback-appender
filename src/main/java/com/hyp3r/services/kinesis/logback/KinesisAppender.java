@@ -6,32 +6,31 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.kinesis.producer.KinesisProducer;
 import com.amazonaws.services.kinesis.producer.KinesisProducerConfiguration;
 import com.amazonaws.services.kinesis.producer.UserRecordResult;
-import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.hyp3r.services.kinesis.logback.models.KinesisLogEvent;
-import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 import java.util.UUID;
 
 public class KinesisAppender<Event extends ILoggingEvent> extends AppenderBase<Event> {
 
+    private static final boolean DEFAULT_EVENTS_ONLY = true;
+
     private boolean initializationFailed = false;
 
-    @Getter @Setter private String appName;
-    @Getter @Setter private String environment;
-    @Getter @Setter private String streamName;
-    @Getter @Setter private String awsRegion;
-    @Getter @Setter private Boolean eventsOnly;
+    @Setter private String appName;
+    @Setter private String environment;
+    @Setter private String streamName;
+    @Setter private String awsRegion;
+    @Setter private Boolean eventsOnly;
 
-    private KinesisProducer kinesisProducer;
+    @Setter private KinesisProducer kinesisProducer;
     private static final Gson GSON = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ssZ").create();
 
     @Override
@@ -51,7 +50,7 @@ public class KinesisAppender<Event extends ILoggingEvent> extends AppenderBase<E
             addError("Invalid configuration - streamName cannot be null for appender: " + name);
         }
 
-        eventsOnly = Optional.ofNullable(eventsOnly).orElse(AppenderConstants.DEFAULT_EVENTS_ONLY);
+        eventsOnly = Optional.ofNullable(eventsOnly).orElse(DEFAULT_EVENTS_ONLY);
 
         try {
             Regions.fromName(awsRegion);
@@ -61,10 +60,13 @@ public class KinesisAppender<Event extends ILoggingEvent> extends AppenderBase<E
         }
 
         if (!initializationFailed) {
-            KinesisProducerConfiguration config = new KinesisProducerConfiguration();
-            config.setRegion(awsRegion);
+            if (kinesisProducer == null) {
+                KinesisProducerConfiguration config = new KinesisProducerConfiguration();
+                config.setRegion(awsRegion);
 
-            kinesisProducer = new KinesisProducer(config);
+                kinesisProducer = new KinesisProducer(config);
+            }
+
             super.start();
         }
     }
@@ -80,39 +82,22 @@ public class KinesisAppender<Event extends ILoggingEvent> extends AppenderBase<E
 
     @Override
     protected void append(Event eventObject) {
-        if (initializationFailed) {
-            addError("Appender has not been initialized. Check necessary config for appender: " + name);
-        } else {
-            KinesisLogEvent kinesisLogEvent = new KinesisLogEvent(appName, environment, eventObject);
-            if (eventsOnly.equals(true) && kinesisLogEvent.getEventType() == null) {
-                // Do not send to kinesis non event logs if flag is true
-                return;
-            }
-
-            String eventJson = GSON.toJson(kinesisLogEvent);
-            try {
-                ListenableFuture<UserRecordResult> f = kinesisProducer.addUserRecord(
-                    streamName,
-                    UUID.randomUUID().toString(), ByteBuffer.wrap(eventJson.getBytes("UTF-8"))
-                );
-                Futures.addCallback(f, kinesisCallback(kinesisLogEvent));
-            } catch (UnsupportedEncodingException e) {
-                addError("Failed to send event to kinesis: " + e.getMessage(), e);
-            }
+        KinesisLogEvent kinesisLogEvent = new KinesisLogEvent(appName, environment, eventObject);
+        if (eventsOnly.equals(true) && kinesisLogEvent.getEventType() == null) {
+            // Do not send to kinesis non event logs if flag is true
+            return;
         }
-    }
 
-    private FutureCallback<UserRecordResult> kinesisCallback(KinesisLogEvent event) {
-        return new FutureCallback<UserRecordResult>() {
-            @Override
-            public void onSuccess(UserRecordResult userRecordResult) {
-            }
-
-            @Override
-            public void onFailure(Throwable e) {
-                addError("Failed to send event to kinesis: " + e.getMessage(), e);
-            }
-        };
+        String eventJson = GSON.toJson(kinesisLogEvent);
+        try {
+            ListenableFuture<UserRecordResult> f = kinesisProducer.addUserRecord(
+                streamName,
+                UUID.randomUUID().toString(), ByteBuffer.wrap(eventJson.getBytes("UTF-8"))
+            );
+            Futures.addCallback(f, new KinesisCallback());
+        } catch (Exception e) {
+            addError("Failed to send event to kinesis: " + e.getMessage(), e);
+        }
     }
 
     // Config Param Validators
