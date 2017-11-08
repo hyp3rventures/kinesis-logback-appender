@@ -1,3 +1,5 @@
+[![Maven Central](https://img.shields.io/maven-central/v/com.hyp3r/kinesis-logback-appender.svg)](https://mvnrepository.com/artifact/com.hyp3r/kinesis-logback-appender)
+
 # Logback Appender for Amazon Kinesis
 This Logback Appender for Amazon Kinesis enables Java applications to send their logs in a structured format to an Amazon Kinesis stream. 
 
