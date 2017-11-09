@@ -124,6 +124,12 @@ task wrapper(type: Wrapper) {
 }
 
 // Test Setup
+test {
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
+
 jacoco {
     toolVersion = '0.7.9'
 }
