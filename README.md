@@ -1,4 +1,4 @@
-[![Maven Central](https://img.shields.io/maven-central/v/com.hyp3r/kinesis-logback-appender.svg)](https://mvnrepository.com/artifact/com.hyp3r/kinesis-logback-appender)
+[![Maven Central](https://img.shields.io/maven-central/v/com.hyp3r/kinesis-logback-appender.svg)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.hyp3r%22%20AND%20a%3A%22kinesis-logback-appender%22)
 [![CircleCI](https://circleci.com/gh/hyp3rventures/kinesis-logback-appender.svg?style=shield&circle-token=:circle-token)](https://circleci.com/gh/hyp3rventures/kinesis-logback-appender)
 [![codecov](https://codecov.io/gh/hyp3rventures/kinesis-logback-appender/branch/master/graph/badge.svg)](https://codecov.io/gh/hyp3rventures/kinesis-logback-appender)
 
