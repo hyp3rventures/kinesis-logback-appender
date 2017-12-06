@@ -39,7 +39,7 @@ public class KinesisLoggerTest {
     private static final String ENV = "test";
     private static final String EVENT_TYPE = "event-type";
     private static final String CONTEXT = "context";
-    private static final String MSG = "this is a debug message ftm {}";
+    private static final String MSG = "this is a debug message fmt {}";
     private static final String ARG = "FMT";
     private static final String FORMATTED_MESSAGE = MessageFormatter.arrayFormat(MSG, new Object[]{ARG}).getMessage();
     private static final HashMap<String, String> MDC = new HashMap<>();
