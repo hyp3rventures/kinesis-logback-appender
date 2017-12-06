@@ -1,5 +1,6 @@
 package com.hyp3r.services.kinesis.logback;
 
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import com.amazonaws.regions.Regions;
@@ -15,6 +16,8 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.ByteBuffer;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -82,7 +85,33 @@ public class KinesisAppender<Event extends ILoggingEvent> extends AppenderBase<E
 
     @Override
     protected void append(Event eventObject) {
-        KinesisLogEvent kinesisLogEvent = new KinesisLogEvent(appName, environment, eventObject);
+        KinesisLogEvent kinesisLogEvent = new KinesisLogEvent();
+        kinesisLogEvent.setAppName(appName);
+        kinesisLogEvent.setEnvironment(environment);
+        kinesisLogEvent.setLevel(eventObject.getLevel().toString());
+        kinesisLogEvent.setLoggerName(eventObject.getLoggerName());
+        kinesisLogEvent.setDescription(eventObject.getFormattedMessage());
+        if (eventObject.getLevel().isGreaterOrEqual(Level.ERROR)) {
+            StringBuilder sb = new StringBuilder();
+            for (StackTraceElement stackTraceElement : eventObject.getCallerData()) {
+                sb.append(stackTraceElement.toString()).append("\n");
+            }
+            kinesisLogEvent.setStacktrace(sb.toString());
+        }
+        kinesisLogEvent.setTimestamp(new Date(eventObject.getTimeStamp()));
+        kinesisLogEvent.setMetadata(new HashMap<>(eventObject.getMDCPropertyMap()));
+
+        // Place event_type and context on top level
+        if (kinesisLogEvent.getMetadata().containsKey("event_type")) {
+            kinesisLogEvent.setEventType(kinesisLogEvent.getMetadata().get("event_type"));
+            kinesisLogEvent.getMetadata().remove("event_type");
+        }
+
+        if (kinesisLogEvent.getMetadata().containsKey("context")) {
+            kinesisLogEvent.setContext(kinesisLogEvent.getMetadata().get("context"));
+            kinesisLogEvent.getMetadata().remove("context");
+        }
+
         if (eventsOnly.equals(true) && kinesisLogEvent.getEventType() == null) {
             // Do not send to kinesis non event logs if flag is true
             return;
