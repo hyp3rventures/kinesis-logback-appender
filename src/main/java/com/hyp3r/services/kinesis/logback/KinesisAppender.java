@@ -34,7 +34,7 @@ public class KinesisAppender<Event extends ILoggingEvent> extends AppenderBase<E
     @Setter private Boolean eventsOnly;
 
     @Setter private KinesisProducer kinesisProducer;
-    private static final Gson GSON = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ssZ").create();
+    private static final Gson GSON = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").create();
 
     @Override
     public void start() {
