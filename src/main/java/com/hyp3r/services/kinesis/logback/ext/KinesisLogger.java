@@ -102,24 +102,24 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
         private final String eventType;
         private final String context;
         private final long startMillis;
+        private boolean stopped = false;
         private EventTimer(KinesisLogger logger, String eventType, String context) {
             this.logger = logger;
             this.eventType = eventType;
             this.context = context;
             this.startMillis = System.currentTimeMillis();
         }
-        private EventTimer(KinesisLogger logger, String eventType) {
-            this(logger, eventType, null);
-        }
 
         @Override
         public void close() {
-            long endMillis = System.currentTimeMillis();
-            logger.kInfo(eventType, context, Collections.singletonMap("took_millis", endMillis-startMillis), "");
+            stop();
         }
 
         public void stop() {
-            close();
+            if (stopped) return;
+            stopped = true;
+            long endMillis = System.currentTimeMillis();
+            logger.kInfo(eventType, context, Collections.singletonMap("took_millis", endMillis-startMillis), "");
         }
     }
 
@@ -128,7 +128,7 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
     }
 
     public EventTimer timer(String eventType) {
-        return new EventTimer(this, eventType);
+        return timer(eventType, null);
     }
 
     private static DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
