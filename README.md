@@ -66,6 +66,49 @@ if (request.getError()) {
 }
 ```
 
+### Additional convenience methods
+
+You may have metadata values that convey context surrounding multiple logging events and wish to avoid passing them
+repeatedly in each logging call.  Or you might just find the code easier to read if the metadata setup is separate
+from the call to the logger.  For that, we have a method `bindMetadata` which adds a key-value-pair to the logging
+context and returns and auto-closeable `MetadataBinding` object that can be closed to remove it from the context again.
+
+Behold:
+```java
+
+        KinesisLogger.MetadataBinding k0 = LOGGER.bindMetadata("k0", "v0");
+
+
+        try (KinesisLogger.MetadataBinding k1 = LOGGER.bindMetadata("k1", "v1");
+             KinesisLogger.MetadataBinding k2 = LOGGER.bindMetadata("k2", "v2")) {
+
+            // Here, the metadata emitted will contain k0, k1, and k2
+            LOGGER.kInfo("my_event", "This is the note for my event");
+
+
+            // Same here.
+            LOGGER.kInfo("my_event", "This is the note for my event");
+
+        }
+
+
+        // Here the only metadata emitted will be k0.
+        LOGGER.kError("my_error", "Something bad happened.", myThrowable);
+
+```
+
+There is also a convenience method for emitting events about the duration of an activity:
+
+```java
+
+        try (KinesisLogger.EventTimer timer =  LOGGER.timer("api_fetch")) {
+            Map data = fetchDataFromAPI();
+        }
+        // At this point, the timer is closed, and an event is emitted of type "api_fetch", with a key "took_millis
+        //       added to the metadata along side any other active metadata bindings.
+
+```
+
 ## Sample Configuration
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
