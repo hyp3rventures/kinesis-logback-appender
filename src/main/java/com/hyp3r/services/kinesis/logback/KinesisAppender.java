@@ -1,8 +1,11 @@
 package com.hyp3r.services.kinesis.logback;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.pattern.ThrowableProxyConverter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.core.AppenderBase;
+import ch.qos.logback.core.html.IThrowableRenderer;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.kinesis.producer.KinesisProducer;
 import com.amazonaws.services.kinesis.producer.KinesisProducerConfiguration;
@@ -16,10 +19,7 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.ByteBuffer;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 public class KinesisAppender<Event extends ILoggingEvent> extends AppenderBase<Event> {
 
@@ -83,6 +83,11 @@ public class KinesisAppender<Event extends ILoggingEvent> extends AppenderBase<E
         }
     }
 
+    private static final ThrowableProxyConverter throwableRenderer = new ThrowableProxyConverter() {{
+        this.setOptionList(Collections.singletonList("full"));
+        this.start();
+    }};
+
     @Override
     protected void append(Event eventObject) {
         KinesisLogEvent kinesisLogEvent = new KinesisLogEvent();
@@ -91,11 +96,9 @@ public class KinesisAppender<Event extends ILoggingEvent> extends AppenderBase<E
         kinesisLogEvent.setLevel(eventObject.getLevel().toString());
         kinesisLogEvent.setLoggerName(eventObject.getLoggerName());
         kinesisLogEvent.setDescription(eventObject.getFormattedMessage());
-        if (eventObject.getLevel().isGreaterOrEqual(Level.ERROR)) {
+        if (eventObject.getLevel().isGreaterOrEqual(Level.WARN) && eventObject.getThrowableProxy() != null) {
             StringBuilder sb = new StringBuilder();
-            for (StackTraceElement stackTraceElement : eventObject.getCallerData()) {
-                sb.append(stackTraceElement.toString()).append("\n");
-            }
+            sb.append(throwableRenderer.convert(eventObject));
             kinesisLogEvent.setStacktrace(sb.toString());
         }
         kinesisLogEvent.setTimestamp(new Date(eventObject.getTimeStamp()));
