@@ -13,15 +13,15 @@ apply plugin: 'signing'
 
 group = 'com.hyp3r'
 archivesBaseName = 'kinesis-logback-appender'
-version = '0.0.4'
+version = '0.0.5'
 
 repositories {
     mavenCentral()
 }
 
 def aws = [
-        'com.amazonaws:aws-java-sdk-core:1.11.221',
-        'com.amazonaws:amazon-kinesis-producer:0.12.5'
+        'com.amazonaws:aws-java-sdk-core:1.11.267',
+        'com.amazonaws:amazon-kinesis-producer:0.12.8'
 ]
 def logback = 'ch.qos.logback:logback-classic:1.2.3'
 def sl4j = [
