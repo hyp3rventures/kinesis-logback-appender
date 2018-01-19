@@ -6,6 +6,12 @@ import org.slf4j.Logger;
 import org.slf4j.MDC;
 import org.slf4j.ext.LoggerWrapper;
 
+import java.io.Closeable;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
 import java.util.Map;
 
 public class KinesisLogger extends LoggerWrapper implements Logger {
@@ -21,10 +27,10 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
         kDebug(eventType, null, fmt, args);
     }
 
-    public void kDebug(String eventType, Map<String, String> mdc, String fmt, Object... args) {
+    public void kDebug(String eventType, Map<String, Object> mdc, String fmt, Object... args) {
         kDebug(eventType, null, mdc, fmt, args);
     }
-    public void kDebug(String eventType, String context, Map<String, String> mdc, String fmt, Object... args) {
+    public void kDebug(String eventType, String context, Map<String, Object> mdc, String fmt, Object... args) {
         kLevel(Level.DEBUG, eventType, context, mdc, fmt, null, args);
     }
 
@@ -32,11 +38,11 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
         kInfo(eventType, null, fmt, args);
     }
 
-    public void kInfo(String eventType, Map<String, String> mdc, String fmt, Object... args) {
+    public void kInfo(String eventType, Map<String, Object> mdc, String fmt, Object... args) {
         kInfo(eventType, null, mdc, fmt, args);
     }
 
-    public void kInfo(String eventType, String context, Map<String, String> mdc, String fmt, Object... args) {
+    public void kInfo(String eventType, String context, Map<String, Object> mdc, String fmt, Object... args) {
         kLevel(Level.INFO, eventType, context, mdc, fmt, null, args);
     }
 
@@ -44,11 +50,11 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
         kWarn(eventType, null, fmt, args);
     }
 
-    public void kWarn(String eventType, Map<String, String> mdc, String fmt, Object... args) {
+    public void kWarn(String eventType, Map<String, Object> mdc, String fmt, Object... args) {
         kWarn(eventType, null, mdc, fmt, args);
     }
 
-    public void kWarn(String eventType, String context, Map<String, String> mdc, String fmt, Object... args) {
+    public void kWarn(String eventType, String context, Map<String, Object> mdc, String fmt, Object... args) {
         kLevel(Level.WARN, eventType, context, mdc, fmt, null, args);
     }
 
@@ -56,11 +62,11 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
         kError(eventType, null, fmt, args);
     }
 
-    public void kError(String eventType, Map<String, String> mdc, String fmt, Object... args) {
+    public void kError(String eventType, Map<String, Object> mdc, String fmt, Object... args) {
         kError(eventType, null, mdc, fmt, args);
     }
 
-    public void kError(String eventType, String context, Map<String, String> mdc, String fmt, Object... args) {
+    public void kError(String eventType, String context, Map<String, Object> mdc, String fmt, Object... args) {
         kLevel(Level.ERROR, eventType, context, mdc, fmt, null, args);
     }
 
@@ -68,29 +74,84 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
         kError(eventType, null, fmt, ex);
     }
 
-    public void kError(String eventType, Map<String, String> mdc, String fmt, Throwable ex) {
+    public void kError(String eventType, Map<String, Object> mdc, String fmt, Throwable ex) {
         kError(eventType, null, mdc, fmt, ex);
     }
 
-    public void kError(String eventType, String context, Map<String, String> mdc, String fmt, Throwable ex) {
+    public void kError(String eventType, String context, Map<String, Object> mdc, String fmt, Throwable ex) {
         kLevel(Level.ERROR, eventType, context, mdc, fmt, ex);
     }
 
-    private void kLevel(Level level, String eventType, String context, Map<String, String> mdc, String fmt, Throwable ex, Object... args) {
+    public static class MetadataBinding implements AutoCloseable {
+        private final MDC.MDCCloseable underlying;
+        private MetadataBinding(MDC.MDCCloseable mdcCloseable) {
+            underlying = mdcCloseable;
+        }
+        @Override
+        public void close() {
+            underlying.close();
+        }
+    }
+
+    public MetadataBinding bindMetadata(String key, Object val) {
+        return new MetadataBinding(MDC.putCloseable(key, formatValue(val)));
+    }
+
+    public static class EventTimer implements AutoCloseable {
+        private final KinesisLogger logger;
+        private final String eventType;
+        private final String context;
+        private final long startMillis;
+        private boolean stopped = false;
+        private EventTimer(KinesisLogger logger, String eventType, String context) {
+            this.logger = logger;
+            this.eventType = eventType;
+            this.context = context;
+            this.startMillis = System.currentTimeMillis();
+        }
+
+        @Override
+        public void close() {
+            stop();
+        }
+
+        public void stop() {
+            if (stopped) return;
+            stopped = true;
+            long endMillis = System.currentTimeMillis();
+            logger.kInfo(eventType, context, Collections.singletonMap("took_millis", endMillis-startMillis), "");
+        }
+    }
+
+    public EventTimer timer(String eventType, String context) {
+        return new EventTimer(this, eventType, context);
+    }
+
+    public EventTimer timer(String eventType) {
+        return timer(eventType, null);
+    }
+
+    private static DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+    private String formatValue(Object val) {
+        if (val instanceof Date) return dateFormat.format((Date) val);
+        return val.toString();
+    }
+
+    private void kLevel(Level level, String eventType, String context, Map<String, Object> mdc, String fmt, Throwable ex, Object... args) {
+        ArrayList<MetadataBinding> boundMetadata = new ArrayList<>();
         if (mdc != null) {
-            for (Map.Entry<String, String> entry : mdc.entrySet()) {
-                MDC.put(entry.getKey(), entry.getValue());
+            for (Map.Entry<String, Object> entry : mdc.entrySet()) {
+                boundMetadata.add(bindMetadata(entry.getKey(), entry.getValue()));
             }
         }
 
         if (StringUtils.isNotBlank(eventType)) {
-            MDC.put("event_type", eventType);
+            boundMetadata.add(bindMetadata("event_type", eventType));
         }
 
         if (StringUtils.isNotBlank(context)) {
-            MDC.put("context", context);
+            boundMetadata.add(bindMetadata("context", context));
         }
-
         switch (level.toInt()) {
             case Level.DEBUG_INT:
                 logger.debug(fmt, args);
@@ -105,8 +166,8 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
                 if (ex == null) {
                     logger.error(fmt, args);
                 } else {
-                    MDC.put("exception", ex.getClass().getName());
-                    MDC.put("exceptionMessage", ex.getMessage());
+                    boundMetadata.add(bindMetadata("exception", ex.getClass().getName()));
+                    boundMetadata.add(bindMetadata("exceptionMessage", ex.getMessage()));
                     logger.error(fmt, ex);
                 }
                 break;
@@ -114,6 +175,8 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
                 logger.trace(fmt, args);
         }
 
-        MDC.clear();
+        for (MetadataBinding closeable : boundMetadata) {
+            closeable.close();
+        }
     }
 }

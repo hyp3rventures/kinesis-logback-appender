@@ -20,8 +20,12 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.MessageFormatter;
 
 import java.nio.ByteBuffer;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.times;
@@ -42,7 +46,7 @@ public class KinesisLoggerTest {
     private static final String MSG = "this is a debug message fmt {}";
     private static final String ARG = "FMT";
     private static final String FORMATTED_MESSAGE = MessageFormatter.arrayFormat(MSG, new Object[]{ARG}).getMessage();
-    private static final HashMap<String, String> MDC = new HashMap<>();
+    private static final HashMap<String, Object> MDC = new HashMap<>();
     private static final String EXCEPTION_MSG = "This is my exception message";
 
     static {
@@ -88,6 +92,54 @@ public class KinesisLoggerTest {
     @Test
     public void shouldCreateKinesisLoggerFactory() {
         new KinesisLoggerFactory();
+    }
+
+    private static DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+
+    @Test
+    public void logWithBoundMetadata() throws Exception {
+        Throwable myThrowable = new IllegalArgumentException("SBH!");
+        KinesisLogger.MetadataBinding server = LOGGER.bindMetadata("server", "hyp3r.org");
+        try (KinesisLogger.MetadataBinding k1 = LOGGER.bindMetadata("k1", "v1");
+             KinesisLogger.MetadataBinding k2 = LOGGER.bindMetadata("k2", "v2");
+             KinesisLogger.MetadataBinding ts = LOGGER.bindMetadata("ts", new Date())) {
+            LOGGER.kInfo("my_event", "This is the note for my event");
+        }
+        LOGGER.kError("my_error", "Something bad happened.", myThrowable);
+        verify(kinesisProducer, times(2)).addUserRecord(captoStreamName.capture(), captorUuid.capture(), captorByteBuffer.capture());
+        KinesisLogEvent logEvent = getLogEvent(captorByteBuffer.getAllValues().get(0));
+        Map<String, String> metadata = logEvent.getMetadata();
+        assertNotNull(dateFormat.parse(metadata.get("ts")));
+        assertTrue(metadata.containsKey("k1"));
+        assertTrue(metadata.containsKey("k2"));
+        assertTrue(metadata.containsKey("server"));
+
+        logEvent = getLogEvent(captorByteBuffer.getAllValues().get(1));
+        metadata = logEvent.getMetadata();
+        assertFalse(metadata.containsKey("ts"));
+        assertFalse(metadata.containsKey("k1"));
+        assertFalse(metadata.containsKey("k2"));
+        assertTrue(metadata.containsKey("server"));
+
+        List<ByteBuffer> jsons = captorByteBuffer.getAllValues();
+        String json = new String(jsons.get(0).array());
+        System.out.println(json);
+        json = new String(jsons.get(1).array());
+        System.out.println(json);
+        server.close();
+    }
+
+    @Test
+    public void logWithEventTimer() throws Exception {
+        try (KinesisLogger.EventTimer timer =  LOGGER.timer("my_timed_event")) {
+            Thread.sleep(100);
+            timer.stop(); //Extra, superfluous stop to test idempotence.
+        }
+        verify(kinesisProducer).addUserRecord(captoStreamName.capture(), captorUuid.capture(), captorByteBuffer.capture());
+        List<ByteBuffer> jsons = captorByteBuffer.getAllValues();
+
+        String json = new String(jsons.get(0).array());
+        System.out.println(json);
     }
 
     @Test
@@ -339,7 +391,7 @@ public class KinesisLoggerTest {
         assertEquals(EVENT_TYPE, logEvent.getEventType());
         assertNull(logEvent.getContext());
         assertEquals(MSG, logEvent.getDescription());
-        assertNotNull(logEvent.getStacktrace());
+        assertNull(logEvent.getStacktrace());
         assertNotNull(logEvent.getTimestamp());
         assertTrue(logEvent.getMetadata().isEmpty());
 
@@ -352,7 +404,7 @@ public class KinesisLoggerTest {
         assertEquals(EVENT_TYPE, logEvent.getEventType());
         assertNull(logEvent.getContext());
         assertEquals(FORMATTED_MESSAGE, logEvent.getDescription());
-        assertNotNull(logEvent.getStacktrace());
+        assertNull(logEvent.getStacktrace());
         assertNotNull(logEvent.getTimestamp());
         assertTrue(logEvent.getMetadata().isEmpty());
 
@@ -365,7 +417,7 @@ public class KinesisLoggerTest {
         assertEquals(EVENT_TYPE, logEvent.getEventType());
         assertNull(logEvent.getContext());
         assertEquals(FORMATTED_MESSAGE, logEvent.getDescription());
-        assertNotNull(logEvent.getStacktrace());
+        assertNull(logEvent.getStacktrace());
         assertNotNull(logEvent.getTimestamp());
         assertTrue(logEvent.getMetadata().containsKey("key"));
         assertEquals("value", logEvent.getMetadata().get("key"));
@@ -379,7 +431,7 @@ public class KinesisLoggerTest {
         assertEquals(EVENT_TYPE, logEvent.getEventType());
         assertEquals(CONTEXT, logEvent.getContext());
         assertEquals(FORMATTED_MESSAGE, logEvent.getDescription());
-        assertNotNull(logEvent.getStacktrace());
+        assertNull(logEvent.getStacktrace());
         assertNotNull(logEvent.getTimestamp());
         assertTrue(logEvent.getMetadata().containsKey("key"));
         assertEquals("value", logEvent.getMetadata().get("key"));
