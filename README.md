@@ -79,8 +79,8 @@ Behold:
         KinesisLogger.MetadataBinding k0 = LOGGER.bindMetadata("k0", "v0");
 
 
-        try (KinesisLogger.MetadataBinding k1 = LOGGER.bindMetadata("k1", "v1");
-             KinesisLogger.MetadataBinding k2 = LOGGER.bindMetadata("k2", "v2")) {
+        try (KinesisLogger.MetadataBinding k1 = LOGGER.bindMetadata("k1", "v1")
+                                                               .and("k2", "v2")) {
 
             // Here, the metadata emitted will contain k0, k1, and k2
             LOGGER.kInfo("my_event", "This is the note for my event");
@@ -106,6 +106,22 @@ There is also a convenience method for emitting events about the duration of an 
         }
         // At this point, the timer is closed, and an event is emitted of type "api_fetch", with a key "took_millis
         //       added to the metadata along side any other active metadata bindings.
+
+```
+
+
+Lastly, you may want to set a permanent metadata binding that applies to every thread in your application (the bindings
+shown up to now are all thread-local).  You can do that too:
+
+```java
+
+        KinesisLogger.addGlobalMetadata("server_id", "192.168.1.1:8080");
+
+        //server_id will appear amongst the metadata for the remainder of the application's lifetime.
+        LOGGER.kInfo("my_event", "This is the note for my event");
+
+        //And you can clear all global metadata if you really want to:
+        KinesisLogger.clearGlobalMetadata();
 
 ```
 
