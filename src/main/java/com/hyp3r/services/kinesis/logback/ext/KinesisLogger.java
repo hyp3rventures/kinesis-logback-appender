@@ -6,13 +6,10 @@ import org.slf4j.Logger;
 import org.slf4j.MDC;
 import org.slf4j.ext.LoggerWrapper;
 
-import java.io.Closeable;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class KinesisLogger extends LoggerWrapper implements Logger {
     public KinesisLogger(Logger logger) {
@@ -83,13 +80,21 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
     }
 
     public static class MetadataBinding implements AutoCloseable {
-        private final MDC.MDCCloseable underlying;
+        private final List<MDC.MDCCloseable> bindings;
         private MetadataBinding(MDC.MDCCloseable mdcCloseable) {
-            underlying = mdcCloseable;
+            bindings = new ArrayList<>();
+            bindings.add(mdcCloseable);
         }
         @Override
         public void close() {
-            underlying.close();
+            for (MDC.MDCCloseable binding : bindings) {
+                binding.close();
+            }
+        }
+
+        public MetadataBinding and(String key, Object val) {
+            bindings.add(MDC.putCloseable(key, formatValue(val)));
+            return this;
         }
     }
 
@@ -132,15 +137,30 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
     }
 
     private static DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
-    private String formatValue(Object val) {
+    private static String formatValue(Object val) {
         if (val instanceof Date) return dateFormat.format((Date) val);
         return val.toString();
+    }
+
+    private static ConcurrentHashMap<String, String> globalMetadata = new ConcurrentHashMap<>();
+
+    public static void addGlobalMetadata(String key, Object val) {
+        globalMetadata.put(key, formatValue(val));
+    }
+
+    public static void clearGlobalMetadata() {
+        globalMetadata.clear();
     }
 
     private void kLevel(Level level, String eventType, String context, Map<String, Object> mdc, String fmt, Throwable ex, Object... args) {
         ArrayList<MetadataBinding> boundMetadata = new ArrayList<>();
         if (mdc != null) {
             for (Map.Entry<String, Object> entry : mdc.entrySet()) {
+                boundMetadata.add(bindMetadata(entry.getKey(), entry.getValue()));
+            }
+        }
+        for (Map.Entry<String, String> entry : globalMetadata.entrySet()) {
+            if (MDC.get(entry.getKey()) == null) {
                 boundMetadata.add(bindMetadata(entry.getKey(), entry.getValue()));
             }
         }
@@ -180,3 +200,4 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
         }
     }
 }
+
