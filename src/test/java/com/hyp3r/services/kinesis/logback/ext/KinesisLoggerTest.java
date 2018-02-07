@@ -130,6 +130,78 @@ public class KinesisLoggerTest {
     }
 
     @Test
+    public void logWithConciselyBoundMetadata() throws Exception {
+        Throwable myThrowable = new IllegalArgumentException("SBH!");
+        KinesisLogger.MetadataBinding server = LOGGER.bindMetadata("server", "hyp3r.org");
+        try (KinesisLogger.MetadataBinding k1 = LOGGER.bindMetadata("k1", "v1")
+                                                               .and("k2", "v2")
+                                                               .and("ts", new Date())) {
+            LOGGER.kInfo("my_event", "This is the note for my event");
+        }
+        LOGGER.kError("my_error", "Something bad happened.", myThrowable);
+        verify(kinesisProducer, times(2)).addUserRecord(captoStreamName.capture(), captorUuid.capture(), captorByteBuffer.capture());
+        KinesisLogEvent logEvent = getLogEvent(captorByteBuffer.getAllValues().get(0));
+        Map<String, String> metadata = logEvent.getMetadata();
+        assertNotNull(dateFormat.parse(metadata.get("ts")));
+        assertTrue(metadata.containsKey("k1"));
+        assertTrue(metadata.containsKey("k2"));
+        assertTrue(metadata.containsKey("server"));
+
+        logEvent = getLogEvent(captorByteBuffer.getAllValues().get(1));
+        metadata = logEvent.getMetadata();
+        assertFalse(metadata.containsKey("ts"));
+        assertFalse(metadata.containsKey("k1"));
+        assertFalse(metadata.containsKey("k2"));
+        assertTrue(metadata.containsKey("server"));
+
+        List<ByteBuffer> jsons = captorByteBuffer.getAllValues();
+        String json = new String(jsons.get(0).array());
+        System.out.println(json);
+        json = new String(jsons.get(1).array());
+        System.out.println(json);
+        server.close();
+    }
+
+
+
+    @Test
+    public void logWithGlobals() throws Exception {
+        Throwable myThrowable = new IllegalArgumentException("SBH!");
+        KinesisLogger.addGlobalMetadata("server", "hyp3r.org");
+        try (KinesisLogger.MetadataBinding k1 = LOGGER.bindMetadata("k1", "v1")
+                                                               .and("k2", "v2")
+                                                               .and("server", "tmpserver")
+                                                               .and("ts", new Date())) {
+            LOGGER.kInfo("my_event", "This is the note for my event");
+        }
+        LOGGER.kError("my_error", "Something bad happened.", myThrowable);
+        verify(kinesisProducer, times(2)).addUserRecord(captoStreamName.capture(), captorUuid.capture(), captorByteBuffer.capture());
+        KinesisLogEvent logEvent = getLogEvent(captorByteBuffer.getAllValues().get(0));
+        Map<String, String> metadata = logEvent.getMetadata();
+        assertNotNull(dateFormat.parse(metadata.get("ts")));
+        assertTrue(metadata.containsKey("k1"));
+        assertTrue(metadata.containsKey("k2"));
+        assertTrue(metadata.get("server").equals("tmpserver"));
+
+        logEvent = getLogEvent(captorByteBuffer.getAllValues().get(1));
+        metadata = logEvent.getMetadata();
+        assertFalse(metadata.containsKey("ts"));
+        assertFalse(metadata.containsKey("k1"));
+        assertFalse(metadata.containsKey("k2"));
+        assertTrue(metadata.get("server").equals("hyp3r.org"));
+
+        List<ByteBuffer> jsons = captorByteBuffer.getAllValues();
+        String json = new String(jsons.get(0).array());
+        System.out.println(json);
+        json = new String(jsons.get(1).array());
+        System.out.println(json);
+        KinesisLogger.clearGlobalMetadata();
+    }
+
+
+
+
+    @Test
     public void logWithEventTimer() throws Exception {
         try (KinesisLogger.EventTimer timer =  LOGGER.timer("my_timed_event")) {
             Thread.sleep(100);
