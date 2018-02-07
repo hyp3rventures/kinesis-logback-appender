@@ -13,7 +13,7 @@ apply plugin: 'signing'
 
 group = 'com.hyp3r'
 archivesBaseName = 'kinesis-logback-appender'
-version = '0.0.5'
+version = '0.0.6'
 
 repositories {
     mavenCentral()
