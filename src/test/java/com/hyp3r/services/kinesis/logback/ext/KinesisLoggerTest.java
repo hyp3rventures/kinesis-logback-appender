@@ -101,7 +101,7 @@ public class KinesisLoggerTest {
         Throwable myThrowable = new IllegalArgumentException("SBH!");
         KinesisLogger.MetadataBinding server = LOGGER.bindMetadata("server", "hyp3r.org");
         try (KinesisLogger.MetadataBinding k1 = LOGGER.bindMetadata("k1", "v1");
-             KinesisLogger.MetadataBinding k2 = LOGGER.bindMetadata("k2", "v2");
+             KinesisLogger.MetadataBinding k2 = LOGGER.bindMetadata("k2", null);
              KinesisLogger.MetadataBinding ts = LOGGER.bindMetadata("ts", new Date())) {
             LOGGER.kInfo("my_event", "This is the note for my event");
         }
