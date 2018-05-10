@@ -138,6 +138,7 @@ public class KinesisLogger extends LoggerWrapper implements Logger {
 
     private static DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
     private static String formatValue(Object val) {
+        if (val == null) return "null";
         if (val instanceof Date) return dateFormat.format((Date) val);
         return val.toString();
     }
